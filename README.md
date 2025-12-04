@@ -20,58 +20,62 @@ Build a chat interface using Gradio with a textbox, a submit button, and a clear
 
 ### PROGRAM:
 ```
+
 import os
-import io
-import gradio as gr
-import IPython.display
-from PIL import Image
-import base64 
-import requests 
-requests.adapters.DEFAULT_TIMEOUT = 60
-
 from dotenv import load_dotenv, find_dotenv
-_ = load_dotenv(find_dotenv()) # read local .env file
-hf_api_key = os.environ['HF_API_KEY']
-
-# Helper function
-import requests, json
+import gradio as gr
 from text_generation import Client
 
-#FalcomLM-instruct endpoint on the text_generation library
-client = Client(os.environ['HF_API_FALCOM_BASE'], headers={"Authorization": f"Basic {hf_api_key}"}, timeout=120)
+load_dotenv(find_dotenv())
+
+HF_API_KEY = os.environ["HF_API_KEY"]
+FALCON_ENDPOINT = os.environ["HF_API_FALCOM_BASE"]
+
+
+client = Client(
+    FALCON_ENDPOINT,
+    headers={"Authorization": f"Basic {HF_API_KEY}"},
+    timeout=120
+)
+
 
 def format_chat_prompt(message, chat_history):
     prompt = ""
-    for turn in chat_history:
-        user_message, bot_message = turn
-        prompt = f"{prompt}\nUser: {user_message}\nAssistant: {bot_message}"
-    prompt = f"{prompt}\nUser: {message}\nAssistant:"
+    for user_msg, bot_msg in chat_history:
+        prompt += f"User: {user_msg}\nAssistant: {bot_msg}\n"
+    prompt += f"User: {message}\nAssistant:"
     return prompt
 
 def respond(message, chat_history):
-        formatted_prompt = format_chat_prompt(message, chat_history)
-        bot_message = client.generate(formatted_prompt,
-                                     max_new_tokens=1024,
-                                     stop_sequences=["\nUser:", "<|endoftext|>"]).generated_text
-        chat_history.append((message, bot_message))
-        return "", chat_history
+    prompt = format_chat_prompt(message, chat_history)
+
+    # Generate using Falcon
+    bot_message = client.generate(
+        prompt,
+        max_new_tokens=512,
+        stop_sequences=["User:", "<|endoftext|>"]
+    ).generated_text
+
+    chat_history.append((message, bot_message))
+    return "", chat_history
 
 with gr.Blocks() as demo:
-    chatbot = gr.Chatbot(height=500) 
-    msg = gr.Textbox(label="Prompt")
-    btn = gr.Button("Submit")
-    clear = gr.ClearButton(components=[msg, chatbot], value="Clear console")
+    gr.Markdown("## 🦅 Falcon LLM — Chatbot (Jupyter Notebook Version)")
 
-    btn.click(respond, inputs=[msg, chatbot], outputs=[msg, chatbot])
-    msg.submit(respond, inputs=[msg, chatbot], outputs=[msg, chatbot]) #Press enter to submit
+    chatbot = gr.Chatbot(height=350)
+    msg = gr.Textbox(label="Type your message...")
+    submit = gr.Button("Send")
+    clear = gr.ClearButton([msg, chatbot])
 
-gr.close_all()
-demo.launch(share=True, server_port=7868)
+    submit.click(respond, [msg, chatbot], [msg, chatbot])
+    msg.submit(respond, [msg, chatbot], [msg, chatbot])
+
+demo.launch(share=False)   # share=True only if you want a public link
 ```
 
 ### OUTPUT:
-<img width="1119" height="660" alt="Screenshot 2025-11-20 220621" src="https://github.com/user-attachments/assets/9d5ee37d-f005-4b16-be89-d12e613810a7" />
 
+<img width="1216" height="849" alt="Screenshot 2025-11-28 101428" src="https://github.com/user-attachments/assets/faeef50b-50ca-4ddc-9d49-12bf15cac38e" />
 
 
 ### RESULT:
